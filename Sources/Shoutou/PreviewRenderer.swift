@@ -5,25 +5,24 @@ import SwiftUI
 @MainActor
 enum PreviewRenderer {
     static func writeAll() {
-        write(name: "empty-light", scheme: .light, fill: false)
-        write(name: "empty-dark", scheme: .dark, fill: false)
-        write(name: "board-light", scheme: .light, fill: true)
-        write(name: "board-dark", scheme: .dark, fill: true)
+        write(name: "board-dark", scheme: .dark, fill: true, composing: false, height: 620)
+        write(name: "compose-dark", scheme: .dark, fill: true, composing: true, height: 780)
     }
 
-    private static func write(name: String, scheme: ColorScheme, fill: Bool) {
+    private static func write(name: String, scheme: ColorScheme, fill: Bool, composing: Bool, height: CGFloat) {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("shoutou-preview-\(UUID().uuidString).json")
         let store = QuestStore(fileURL: url)
         if fill {
             populate(store)
         }
-        let view = QuestBoardView(store: store, chrome: AppChrome())
+        let chrome = AppChrome()
+        chrome.isPinned = false
+        let view = QuestBoardView(store: store, chrome: chrome, startsComposing: composing)
             .environment(\.colorScheme, scheme)
-            .frame(width: 380)
+            .frame(width: 400, height: height)
         let host = NSHostingController(rootView: view)
-        let fitted = host.sizeThatFits(in: NSSize(width: 380, height: 1200))
-        let size = NSSize(width: 380, height: max(fitted.height, 200))
+        let size = NSSize(width: 400, height: height)
         let window = NSWindow(
             contentRect: NSRect(origin: .zero, size: size),
             styleMask: [.borderless],
@@ -33,9 +32,13 @@ enum PreviewRenderer {
         window.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
         window.contentViewController = host
         window.setContentSize(size)
-        window.setFrameOrigin(NSPoint(x: 80, y: 120))
+        window.setFrameOrigin(NSPoint(x: 2700, y: 360))
         window.level = .floating
-        window.makeKeyAndOrderFront(nil)
+        if composing {
+            window.makeKeyAndOrderFront(nil)
+        } else {
+            window.orderFrontRegardless()
+        }
         let until = Date().addingTimeInterval(0.35)
         while Date() < until {
             RunLoop.current.run(mode: .default, before: until)
@@ -63,14 +66,15 @@ enum PreviewRenderer {
     }
 
     private static func populate(_ store: QuestStore) {
-        if let parked = store.add(title: "整理参考文献", subtaskTitle: "把重复的条目删掉") {
-            store.park(parked.id)
-        }
-        if let done = store.add(title: "导出预实验数据", subtaskTitle: "存成 csv") {
-            store.complete(done.id)
-        }
         store.add(title: "回导师关于开题的邮件", subtaskTitle: "附上上周的进度表")
-        store.add(title: "修问卷的跳题", subtaskTitle: "第 6 题选否应跳到第 9 题")
-        store.add(title: "改排除标准", subtaskTitle: "把反应时小于 100ms 的试次标出来")
+        if let survey = store.add(title: "修问卷的跳题", subtaskTitle: "第 6 题选否应跳到第 9 题") {
+            store.addSubtask(questID: survey.id, title: "检查第 12 题是不是必填")
+        }
+        if let main = store.add(title: "改排除标准", subtaskTitle: "标出反应时过短的试次") {
+            store.addSubtask(questID: main.id, title: "重跑三组种子")
+            if let first = main.subtasks.first {
+                store.setSubtaskDone(questID: main.id, subtaskID: first.id, isDone: true)
+            }
+        }
     }
 }

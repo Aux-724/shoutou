@@ -12,6 +12,7 @@ enum ComposerField: Hashable {
 struct QuestBoardView: View {
     var store: QuestStore
     var chrome: AppChrome
+    var startsComposing = false
 
     @Environment(\.colorScheme) private var scheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -39,6 +40,11 @@ struct QuestBoardView: View {
             guard composing else { return }
             DispatchQueue.main.async {
                 focus = .captureTitle
+            }
+        }
+        .onAppear {
+            if startsComposing {
+                isComposing = true
             }
         }
     }
